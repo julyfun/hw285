@@ -1,5 +1,6 @@
 import itertools
 from torch import nn
+from torch._inductor.codegen.wrapper import ReuseKey
 from torch.nn import functional as F
 import torch.distributions as D
 from torch import optim
@@ -59,20 +60,28 @@ class MLPPolicy(nn.Module):
     @torch.no_grad()
     def get_action(self, obs: np.ndarray) -> np.ndarray:
         """Takes a single observation (as a numpy array) and returns a single action (as a numpy array)."""
-        # TODO: implement get_action
-        action = None
+        # DONE: implement get_action
+        if self.discrete:
+            # logitsnet -> [B, choice_dim(logits)]
+            logits = self.logits_net(ptu.from_numpy(obs)) # .argmax(dim=0, keepdim=True)
+            dist = torch.distributions.Categorical(logits=logits)
+            action = dist.sample()
+            return ptu.to_numpy(action)
+        # [B, action_dim]
+        return ptu.to_numpy(self.mean_net(ptu.from_numpy(obs)))
 
-        return action
-
-    def forward(self, obs: torch.FloatTensor):
+    def forward(self, obs: torch.FloatTensor) -> dict:
         """
         This function defines the forward pass of the network.  You can return anything you want, but you should be
         able to differentiate through it. For example, you can return a torch.FloatTensor. You can also return more
         flexible objects, such as a `torch.distributions.Distribution` object. It's up to you!
         """
         if self.discrete:
-            # TODO: define the forward pass for a policy with a discrete action space.
-            pass
+            # DONE: define the forward pass for a policy with a discrete action space.
+            logits: torch.Tensor = self.logits_net(obs)
+            return {
+                "logits": logits
+            }
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
             pass
@@ -99,12 +108,20 @@ class MLPPolicyPG(MLPPolicy):
         actions = ptu.from_numpy(actions)
         advantages = ptu.from_numpy(advantages)
 
-        # TODO: compute the policy gradient actor loss
-        loss = None
+        # DONE: compute the policy gradient actor loss
+        if self.discrete:
+            # actions: (b, 1), but at this point it has float32
+            self.optimizer.zero_grad()
+            logits : torch.Tensor = self.forward(obs)["logits"] # (b, action_num)
+            dist = torch.distributions.Categorical(logits=logits)
+            log_prob = dist.log_prob(actions.int())
+            loss: torch.Tensor = (-log_prob * advantages).mean()
+            loss.backward()
 
-        # TODO: perform an optimizer step
-        pass
+            # TODO: perform an optimizer step
+            self.optimizer.step()
 
-        return {
-            "Actor Loss": loss.item(),
-        }
+            return {
+                "Actor Loss": loss.item(),
+            }
+        raise NotImplementedError

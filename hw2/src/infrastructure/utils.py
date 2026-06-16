@@ -29,15 +29,15 @@ def sample_trajectory(
                 cv2.resize(img, dsize=(250, 250), interpolation=cv2.INTER_CUBIC)
             )
 
-        # TODO use the most recent ob to decide what to do
-        ac = None
+        # DONE use the most recent ob to decide what to do
+        ac = policy.get_action(ob)
 
-        # TODO: take that action and get reward and next ob
-        next_ob, rew, done, info = None, None, None, None
+        # DONE: take that action and get reward and next ob
+        next_ob, rew, done, info = env.step(ac)
 
-        # TODO rollout can end due to done, or due to max_length
+        # DONE: rollout can end due to done, or due to max_length
         steps += 1
-        rollout_done = None
+        rollout_done = done or steps == max_length
 
         # record result of taking that action
         obs.append(ob)
@@ -69,7 +69,11 @@ def sample_trajectories(
     max_length: int,
     render: bool = False,
 ) -> Tuple[List[Dict[str, np.ndarray]], int]:
-    """Collect rollouts using policy until we have collected min_timesteps_per_batch steps."""
+    """
+    Collect rollouts using policy until we have collected min_timesteps_per_batch steps.
+
+    The list len >= batch size.
+    """
     timesteps_this_batch = 0
     trajs = []
     while timesteps_this_batch < min_timesteps_per_batch:
