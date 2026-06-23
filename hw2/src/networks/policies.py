@@ -67,8 +67,11 @@ class MLPPolicy(nn.Module):
             dist = torch.distributions.Categorical(logits=logits)
             action = dist.sample()
             return ptu.to_numpy(action)
-        # [B, action_dim]
-        return ptu.to_numpy(self.mean_net(ptu.from_numpy(obs)))
+
+        mean = self.mean_net(ptu.from_numpy(obs))
+        dist = torch.distributions.Normal(mean, self.logstd.exp())
+        action = dist.sample()
+        return ptu.to_numpy(action)
 
     def forward(self, obs: torch.FloatTensor) -> dict:
         """
@@ -83,8 +86,11 @@ class MLPPolicy(nn.Module):
                 "logits": logits
             }
         else:
-            # TODO: define the forward pass for a policy with a continuous action space.
-            pass
+            # DONE: define the forward pass for a policy with a continuous action space.
+            return {
+                "mean": self.mean_net(obs),
+                "logstd": self.logstd,
+            }
 
     def update(self, obs: np.ndarray, actions: np.ndarray, *args, **kwargs) -> dict:
         """
@@ -112,16 +118,29 @@ class MLPPolicyPG(MLPPolicy):
         if self.discrete:
             # actions: (b, 1), but at this point it has float32
             self.optimizer.zero_grad()
-            logits : torch.Tensor = self.forward(obs)["logits"] # (b, action_num)
+            logits : torch.Tensor = self.logits_net(obs) # (b, action_num)
             dist = torch.distributions.Categorical(logits=logits)
             log_prob = dist.log_prob(actions.int())
             loss: torch.Tensor = (-log_prob * advantages).mean()
             loss.backward()
 
-            # TODO: perform an optimizer step
+            # DONE: perform an optimizer step
             self.optimizer.step()
 
             return {
                 "Actor Loss": loss.item(),
             }
-        raise NotImplementedError
+        self.optimizer.zero_grad()
+        mean = self.mean_net(obs)
+        assert actions.shape == mean.shape # (b, ac_dim)
+
+        dist = torch.distributions.Normal(mean, self.logstd.exp())
+        log_prob = dist.log_prob(actions).sum(dim=1)
+
+        loss = -(log_prob * advantages).mean()
+        loss.backward()
+        self.optimizer.step()
+
+        return {
+            "Actor Loss": loss.item(),
+        }

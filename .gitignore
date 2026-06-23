@@ -5,3 +5,5 @@
 .zed
 __pycache__
 ignore*
+*.pdf
+*.TXT

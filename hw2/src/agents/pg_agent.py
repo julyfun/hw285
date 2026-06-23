@@ -70,6 +70,7 @@ class PGAgent(nn.Module):
         # actions can be [ [1, 2], [3, 4, 5] ]
         obs = np.concatenate(obs)
         actions = np.concatenate(actions)
+        rewards = np.concatenate(rewards)
         terminals = np.concatenate(terminals)
         q_values = np.concatenate(q_values)
 
@@ -84,8 +85,10 @@ class PGAgent(nn.Module):
 
         # step 4: if needed, use all datapoints (s_t, a_t, q_t) to update the PG critic/baseline
         if self.critic is not None:
-            # TODO: perform `self.baseline_gradient_steps` updates to the critic/baseline network
+            # DONE: perform `self.baseline_gradient_steps` updates to the critic/baseline network
             critic_info = None
+            for _ in range(self.baseline_gradient_steps):
+                critic_info = self.critic.update(obs, q_values) # 多个小步，注意并不等价于放大 lr
 
             info.update(critic_info)
 
@@ -149,13 +152,13 @@ class PGAgent(nn.Module):
             from typing import Any
             advantages: np.ndarray[Any, np.dtype[np.float64]] = q_values
         else:
-            # TODO: run the critic and use it as a baseline
-            values = None
-            assert values.shape == q_values.shape
+            # DONE: run the critic and use it as a baseline
+            values = ptu.to_numpy(self.critic(ptu.from_numpy(obs)).squeeze(1)) # (b, 1) -> (b, )
+            assert values.shape == q_values.shape, f"{values.shape} vs {q_values.shape}"
 
             if self.gae_lambda is None:
-                # TODO: if using a baseline, but not GAE, what are the advantages?
-                advantages = None
+                # DONE: if using a baseline, but not GAE, what are the advantages?
+                advantages = q_values - values # Q(s, a) - V(s)
             else:
                 # TODO: implement GAE
                 batch_size = obs.shape[0]

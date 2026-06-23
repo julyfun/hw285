@@ -35,18 +35,24 @@ class ValueCritic(nn.Module):
         )
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
-        # TODO: implement the forward pass of the critic network
-        pass
+        # DONE: implement the forward pass of the critic network
+        return self.network(obs)
 
     def update(self, obs: np.ndarray, q_values: np.ndarray) -> dict:
+        """
+        这里 q_values 而不是 values? 原因是只能使用实际动作 Q(s, a) 作为 V(s). 因为两者的期望一样.
+        q_values: (b, )
+        """
         obs = ptu.from_numpy(obs)
         q_values = ptu.from_numpy(q_values)
 
-        # TODO: compute the loss using the observations and q_values
-        loss = None
+        # DONE: compute the loss using the observations and q_values
+        self.optimizer.zero_grad()
+        loss = F.mse_loss(self.forward(obs).squeeze(1), q_values)
+        loss.backward()
 
-        # TODO: perform an optimizer step
-        pass
+        # DONE: perform an optimizer step
+        self.optimizer.step()
 
         return {
             "Baseline Loss": loss.item(),
