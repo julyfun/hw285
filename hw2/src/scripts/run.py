@@ -101,8 +101,7 @@ def run_training_loop(logger: Logger, args):
             # perform the logging
             for key, value in logs.items():
                 print("{} : {}".format(key, value))
-            logger.log(logs, total_envsteps)
-            # logger.log(logs, itr)
+            logger.log(logs, itr)
             print("Done logging...\n\n", flush=True)
 
         if args.video_log_freq != -1 and itr % args.video_log_freq == 0:
