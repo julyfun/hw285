@@ -146,6 +146,8 @@ class PGAgent(nn.Module):
         """Computes advantages by (possibly) subtracting a value baseline from the estimated Q-values.
 
         Operates on flat 1D NumPy arrays.
+
+        q_values here is always estimated using Monte Carlo.
         """
         if self.critic is None:
             # DONE: if no baseline, then what are the advantages?
@@ -158,9 +160,9 @@ class PGAgent(nn.Module):
 
             if self.gae_lambda is None:
                 # DONE: if using a baseline, but not GAE, what are the advantages?
-                advantages = q_values - values # Q(s, a) - V(s)
+                advantages = q_values - values # monte-carlo(Q(s, a)) - V(s)
             else:
-                # TODO: implement GAE
+                # DONE: implement GAE
                 batch_size = obs.shape[0]
 
                 # HINT: append a dummy T+1 value for simpler recursive calculation
@@ -168,10 +170,11 @@ class PGAgent(nn.Module):
                 advantages = np.zeros(batch_size + 1)
 
                 for i in reversed(range(batch_size)):
-                    # TODO: recursively compute advantage estimates starting from timestep T.
+                    # DONE: recursively compute advantage estimates starting from timestep T.
                     # HINT: use terminals to handle edge cases. terminals[i] is 1 if the state is the last in its
                     # trajectory, and 0 otherwise.
-                    pass
+                    advantages[i] = rewards[i] + (1.0 - terminals[i]) * self.gamma * values[i + 1] - values[i] \
+                        + self.gamma * self.gae_lambda * advantages[i + 1]
 
                 # remove dummy advantage
                 advantages = advantages[:-1]

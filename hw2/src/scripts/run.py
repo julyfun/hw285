@@ -16,7 +16,7 @@ from infrastructure.log_utils import setup_wandb, Logger, dump_log
 MAX_NVIDEO = 2
 
 
-def run_training_loop(logger, args):
+def run_training_loop(logger: Logger, args):
     # set random seeds
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -101,7 +101,8 @@ def run_training_loop(logger, args):
             # perform the logging
             for key, value in logs.items():
                 print("{} : {}".format(key, value))
-            logger.log(logs, itr)
+            logger.log(logs, total_envsteps)
+            # logger.log(logs, itr)
             print("Done logging...\n\n", flush=True)
 
         if args.video_log_freq != -1 and itr % args.video_log_freq == 0:
