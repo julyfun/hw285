@@ -80,13 +80,14 @@ class DQNAgent(nn.Module):
             next_q_values = next_qa_values.gather(1, next_action.unsqueeze(1)).squeeze(1) # (b, )
             assert next_q_values.shape == (batch_size,), next_q_values.shape
 
-            target_values = reward + self.discount * next_q_values
+            target_values = reward + self.discount * next_q_values * (1.0 - done.float())
             assert target_values.shape == (batch_size,), target_values.shape
             # ENDTODO
 
         # TODO(Section 2.4): train the critic with the target values
         qa_values = self.critic.forward(obs)
-        q_values = qa_values.max(dim=1).values # (b,)
+        # 目标是拟合任意 (obs, action) 的实际价值，所以是 gather 而不是 max(dim=1)
+        q_values = qa_values.gather(1, action.unsqueeze(1)).squeeze(1)
         loss = torch.nn.functional.mse_loss(q_values, target_values)
         # ENDTODO
 
