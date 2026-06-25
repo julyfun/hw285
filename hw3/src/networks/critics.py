@@ -17,7 +17,7 @@ class DQNCritic(nn.Module):
             size=size,
         )
 
-    def forward(self, obs):
+    def forward(self, obs: torch.Tensor) -> torch.Tensor:
         """
         Return Q-values for all actions.
 
