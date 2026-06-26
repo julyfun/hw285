@@ -198,15 +198,16 @@ class SoftActorCritic(nn.Module):
         # Compute target values
         with torch.no_grad():
             # TODO(Section 3.2): Sample from the actor and compute next Q-values
-            next_action_distribution = self.actor.forward(obs)
+            next_action_distribution = self.actor.forward(next_obs) # (b, ac_dim)
             next_action = next_action_distribution.sample() # (b, )
-            next_qs = torch.stack([c(next_obs, next_action) for c in self.target_critics], dim=0)
+            next_qs = torch.stack([c(next_obs, next_action) for c in self.target_critics], dim=0) # (nc, b)
             # ENDTODO
 
             if self.use_entropy_bonus and self.backup_entropy:
                 # TODO(Section 3.3): Add entropy bonus to the target values for SAC
-                next_action_entropy = None
+                next_action_entropy = self.entropy(next_action_distribution) # (b,)
                 # Hint: next_qs = ...
+                next_qs = next_qs + (self.temperature * next_action_entropy).unsqueeze(0) # (nc, b)
                 # ENDTODO
 
             # Handle Q-values from multiple different target critic networks (if necessary)
@@ -247,11 +248,15 @@ class SoftActorCritic(nn.Module):
     def entropy(self, action_distribution: torch.distributions.Distribution):
         """
         Compute the (approximate) entropy of the action distribution for each batch element.
+
+        returns (b, ac_dim)
         """
 
         # TODO(Section 3.3): Compute the entropy of the action distribution.
         # Note: Think about whether to use .rsample() or .sample() here...
-        return None
+        just_sample_actions = action_distribution.rsample()
+        minus_log_prob = -action_distribution.log_prob(just_sample_actions)
+        return minus_log_prob
         # ENDTODO
 
     def actor_loss_reparametrize(self, obs: torch.Tensor):
@@ -287,7 +292,7 @@ class SoftActorCritic(nn.Module):
         loss, entropy, log_prob = self.actor_loss_reparametrize(obs)
 
         # TODO(Section 3.3): Add the entropy bonus to the actor loss: loss -= [your entropy bonus here]
-        pass
+        loss -= entropy
         # ENDTODO
 
         self.actor_optimizer.zero_grad()
@@ -371,7 +376,7 @@ class SoftActorCritic(nn.Module):
         # ENDTODO
 
         # TODO(Section 3.3): Enable the actor update (once you have implemented entropy)
-        actor_info = {}
+        actor_info = self.update_actor(observations)
         # ENDTODO
 
         # Update alpha (temperature) using dual gradient descent (Section 3.5)
