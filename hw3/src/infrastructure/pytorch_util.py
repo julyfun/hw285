@@ -82,7 +82,7 @@ def from_numpy(data: Union[np.ndarray, dict], **kwargs):
     if isinstance(data, dict):
         return {k: from_numpy(v) for k, v in data.items()}
     else:
-        data = torch.from_numpy(data, **kwargs)
+        data :torch.Tensor = torch.from_numpy(data, **kwargs)
         if data.dtype == torch.float64:
             data = data.float()
         return data.to(device)

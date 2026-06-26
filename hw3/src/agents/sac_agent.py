@@ -6,6 +6,7 @@ from torch import nn
 import numpy as np
 
 from infrastructure import pytorch_util as ptu
+from networks.policies import MLPPolicy
 
 
 class SoftActorCritic(nn.Module):
@@ -52,7 +53,7 @@ class SoftActorCritic(nn.Module):
             target_update_period is not None or soft_target_update_rate is not None
         ), "Must specify either target_update_period or soft_target_update_rate"
 
-        self.actor = make_actor(observation_shape, action_dim)
+        self.actor: MLPPolicy = make_actor(observation_shape, action_dim)
         self.actor_optimizer = make_actor_optimizer(self.actor.parameters())
         self.actor_lr_scheduler = make_actor_schedule(self.actor_optimizer)
 
@@ -197,9 +198,9 @@ class SoftActorCritic(nn.Module):
         # Compute target values
         with torch.no_grad():
             # TODO(Section 3.2): Sample from the actor and compute next Q-values
-            next_action_distribution = None
-            next_action = None
-            next_qs = None
+            next_action_distribution = self.actor.forward(obs)
+            next_action = next_action_distribution.sample() # (b, )
+            next_qs = torch.stack([c(next_obs, next_action) for c in self.target_critics], dim=0)
             # ENDTODO
 
             if self.use_entropy_bonus and self.backup_entropy:
@@ -217,7 +218,7 @@ class SoftActorCritic(nn.Module):
             ), next_qs.shape
 
             # TODO(Section 3.2): Compute the target Q-value
-            target_values = None
+            target_values = reward.unsqueeze(0) + self.discount * next_qs * (1.0 - done.float().unsqueeze(0))
             # ENDTODO
             assert target_values.shape == (
                 self.num_critic_networks,
@@ -226,11 +227,11 @@ class SoftActorCritic(nn.Module):
 
         # TODO(Section 3.2): Update the critic
         # Predict Q-values
-        q_values = None
+        q_values = torch.stack([c(obs, action) for c in self.critics], dim=0)
         assert q_values.shape == (self.num_critic_networks, batch_size), q_values.shape
 
         # Compute loss
-        loss = None
+        loss = self.critic_loss(q_values, target_values)
         # ENDTODO
 
         self.critic_optimizer.zero_grad()
@@ -359,7 +360,13 @@ class SoftActorCritic(nn.Module):
         critic_infos = []
         # TODO(Section 3.2): Update the critic for num_critic_updates steps
         for _ in range(self.num_critic_updates):
-            info = None
+            info = self.update_critic(
+                observations,
+                actions,
+                rewards,
+                next_observations,
+                dones,
+            )
             critic_infos.append(info)
         # ENDTODO
 
@@ -378,7 +385,11 @@ class SoftActorCritic(nn.Module):
         #  - step
         #  - self.target_update_period (None when using soft updates)
         #  - self.soft_target_update_rate (None when using hard updates)
-        pass
+        if self.target_update_period is not None:
+            if step % self.target_update_period == 0:
+                self.update_target_critic()
+        else:
+            self.soft_update_target_critic(self.soft_target_update_rate)
         # ENDTODO
 
         # Average the critic info over all of the steps
