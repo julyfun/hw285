@@ -90,9 +90,9 @@ class SoftActorCritic(nn.Module):
         if self.auto_tune_temperature:
             # TODO(Section 3.5): Initialize log_alpha, alpha_optimizer, and target_entropy
             # Hint: Initialize log_alpha to log(temperature) so alpha starts at the given temperature
-            self.log_alpha = None
-            self.alpha_optimizer = None
-            self.target_entropy = None
+            self.log_alpha = nn.Parameter(torch.tensor(temperature).log().to(ptu.device))
+            self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=alpha_learning_rate)
+            self.target_entropy = -action_dim
             # ENDTODO
 
         self.critic_loss = nn.MSELoss()
@@ -105,8 +105,7 @@ class SoftActorCritic(nn.Module):
         """
         if self.auto_tune_temperature:
             # TODO(Section 3.5): Return the current learned temperature
-            # skip here until we implement the temperature tuning
-            return None
+            return float(self.log_alpha.exp().item())
             # ENDTODO
         else:
             return self.temperature
@@ -324,8 +323,8 @@ class SoftActorCritic(nn.Module):
             return {}
 
         # TODO(Section 3.5): Implement dual gradient descent for temperature tuning
-        alpha = None
-        alpha_loss = None
+        alpha = self.log_alpha.exp()
+        alpha_loss = -(alpha * (log_prob + self.target_entropy)).mean()
 
         self.alpha_optimizer.zero_grad()
         alpha_loss.backward()
