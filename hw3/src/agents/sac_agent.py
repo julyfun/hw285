@@ -207,7 +207,7 @@ class SoftActorCritic(nn.Module):
                 # TODO(Section 3.3): Add entropy bonus to the target values for SAC
                 next_action_entropy = self.entropy(next_action_distribution) # (b,)
                 # Hint: next_qs = ...
-                next_qs = next_qs + (self.temperature * next_action_entropy).unsqueeze(0) # (nc, b)
+                next_qs = next_qs + (self.get_temperature() * next_action_entropy).unsqueeze(0) # (nc, b)
                 # ENDTODO
 
             # Handle Q-values from multiple different target critic networks (if necessary)
@@ -267,12 +267,12 @@ class SoftActorCritic(nn.Module):
 
         # TODO(Section 3.4): Sample actions using reparameterization (replace the placeholder below)
         # Note: Think about whether to use .rsample() or .sample() here, and why...
-        action = torch.zeros(batch_size, self.action_dim, device=obs.device) # replace this with the correct action
+        action = action_distribution.rsample()
         assert action.shape == (batch_size, self.action_dim), action.shape
         # ENDTODO
 
         # TODO(Section 3.4): Compute Q-values for the sampled state-action pair (replace the placeholder below)
-        q_values = torch.zeros(self.num_critic_networks, batch_size, device=obs.device) # replace this with the correct q_values
+        q_values = torch.stack([c(obs, action) for c in self.critics], dim=0)
         assert q_values.shape == (self.num_critic_networks, batch_size), q_values.shape
         # ENDTODO
 
@@ -280,7 +280,7 @@ class SoftActorCritic(nn.Module):
         log_prob = action_distribution.log_prob(action)
 
         # TODO(Section 3.4): Compute the actor loss (replace the placeholder below)
-        loss = torch.tensor(0.0, device=obs.device) # replace this with the correct loss
+        loss = -q_values.mean()
         # ENDTODO
 
         return loss, torch.mean(self.entropy(action_distribution)), log_prob
@@ -292,7 +292,7 @@ class SoftActorCritic(nn.Module):
         loss, entropy, log_prob = self.actor_loss_reparametrize(obs)
 
         # TODO(Section 3.3): Add the entropy bonus to the actor loss: loss -= [your entropy bonus here]
-        loss -= entropy
+        loss -= entropy * self.get_temperature()
         # ENDTODO
 
         self.actor_optimizer.zero_grad()
